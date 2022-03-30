@@ -15,7 +15,6 @@ impl <'t, 'c: 't> EntryTypeParser<'t, 'c> {
     pub fn entry_type(&mut self) -> EntryType {
         self.tokenizer.consume_while(&IS_ENTRY_VALID_CHARACTER)
     }
-
 }
 
 #[allow(non_snake_case)]

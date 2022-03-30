@@ -30,7 +30,7 @@ impl <'t, 'c: 't> BibTexEntryParser<'t, 'c> {
         }
 
         self.tokenizer.skip(&CLOSE_BRACKET);
-        BibTexEntry { entry_type, cite_key, fields }
+        BibTexEntry { entry_type, cite_key, fields  }
     }
 
 }

@@ -12,13 +12,13 @@ pub mod content_parser;
 pub mod word_parser;
 pub mod quoted_content_parser;
 pub mod braced_content_parser;
+pub mod content;
 
 pub struct BibTexParser<'t, 'c> {
     tokenizer: &'t mut Tokenizer<'c>
 }
 
 impl <'t, 'c: 't> BibTexParser<'t, 'c> {
-
     pub fn new(tokenizer: &'t mut Tokenizer<'c>) -> BibTexParser<'t, 'c> {
         BibTexParser { tokenizer }
     }

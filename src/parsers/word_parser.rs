@@ -1,4 +1,5 @@
-use crate::Tokenizer;
+use crate::Content::Inlined;
+use crate::{Content, Tokenizer};
 use crate::tokenizer::{ALPHA};
 
 pub struct WordParser<'t, 'c> {
@@ -11,11 +12,11 @@ impl<'t, 'c: 't> WordParser<'t, 'c> {
     }
 
     // [a-zA-Z][a-zA-Z0-9-_:/+]*
-    pub fn word(&mut self) -> String {
+    pub fn word(&mut self) -> Content {
         let mut word = String::new();
         word.push(self.tokenizer.consume(&IS_FIRST_WORD_CHARACER));
         word.push_str(&self.tokenizer.consume_while(&IS_NTH_WORD_CHARACTER));
-        word
+        Inlined(word)
     }
 }
 

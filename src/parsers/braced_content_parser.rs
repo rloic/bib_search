@@ -1,4 +1,5 @@
-use crate::Tokenizer;
+use crate::{Content, Tokenizer};
+use crate::Content::Braced;
 use crate::tokenizer::{ANY, CLOSE_BRACKET, ESCAPED, OPEN_BRACKET, WS};
 
 pub struct BracedContentParser<'t, 'c> {
@@ -11,7 +12,7 @@ impl<'t, 'c: 't> BracedContentParser<'t, 'c> {
     }
 
     // '{' text '}'
-    pub fn braced_content(&mut self) -> String {
+    pub fn braced_content(&mut self) -> Content {
         self.tokenizer.skip_ws = false;
         self.tokenizer.skip_comment = false;
         self.tokenizer.skip(&OPEN_BRACKET);
@@ -44,6 +45,6 @@ impl<'t, 'c: 't> BracedContentParser<'t, 'c> {
         self.tokenizer.skip_comment = true;
         self.tokenizer.skip_ws = true;
         self.tokenizer.skip(&CLOSE_BRACKET);
-        text
+        Braced(text)
     }
 }

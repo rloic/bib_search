@@ -1,4 +1,5 @@
-use crate::Tokenizer;
+use Content::Quoted;
+use crate::{Content, Tokenizer};
 use crate::tokenizer::{ANY, DOUBLE_QUOTE, ESCAPED, WS};
 
 pub struct QuotedContentParser<'t, 'c> {
@@ -11,7 +12,7 @@ impl<'t, 'c: 't> QuotedContentParser<'t, 'c> {
     }
 
     // '"' [^"] '"'
-    pub fn quoted_content(&mut self) -> String {
+    pub fn quoted_content(&mut self) -> Content {
         self.tokenizer.skip_ws = false;
         self.tokenizer.skip_comment = false;
         self.tokenizer.skip(&DOUBLE_QUOTE);
@@ -33,6 +34,6 @@ impl<'t, 'c: 't> QuotedContentParser<'t, 'c> {
         self.tokenizer.skip_comment = true;
         self.tokenizer.skip_ws = true;
         self.tokenizer.skip(&DOUBLE_QUOTE);
-        text
+        Quoted(text)
     }
 }

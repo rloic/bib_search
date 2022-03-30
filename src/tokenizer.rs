@@ -1,5 +1,6 @@
 use std::str::Chars;
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Info {
     pub line: usize,
     pub column: usize,

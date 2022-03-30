@@ -18,7 +18,7 @@ impl FieldContains {
 impl Filter<BibTexEntry> for FieldContains {
     fn accept(&self, element: &BibTexEntry) -> bool {
         element.fields.get(self.field_name.as_str())
-            .map(|it| simplify_latex(&it).contains(&self.sequence))
+            .map(|it| simplify_latex(&it.to_string()).contains(&self.sequence))
             .unwrap_or(false)
     }
 }
@@ -57,7 +57,7 @@ impl Filter<BibTexEntry> for AnyFieldsContains {
     fn accept(&self, element: &BibTexEntry) -> bool {
         simplify_latex(&element.entry_type).contains(&self.sequence) ||
             simplify_latex(&element.cite_key).contains(&self.sequence) ||
-            element.fields.iter().any(|(_, v)| simplify_latex(&v).contains(&self.sequence))
+            element.fields.iter().any(|(_, v)| simplify_latex(&v.to_string()).contains(&self.sequence))
     }
 }
 
