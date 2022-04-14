@@ -1,14 +1,18 @@
 use std::cmp::{max, min};
+use regex::Regex;
 use crate::BibTexEntry;
+
+const MAX_TITLE_LEN: usize = 40;
 
 pub struct Presenter {}
 
 impl crate::presenter::Presenter<Vec<&&BibTexEntry>> for Presenter {
     fn present(&self, data: &Vec<&&BibTexEntry>) {
-        let mut col_width = vec![10, 10, 20, 10, 4];
+        let author_split = Regex::new("( ?; ?| and\\.? | with )").unwrap();
+        let mut col_width = vec![10, 10, 20, 6, 4];
         for entry in data {
             let authors = entry.fields.get("author").map(|it| it.to_string()).unwrap_or(String::new());
-            for author in authors.split(" and ") {
+            for author in author_split.split(&authors) {
                 col_width[3] = max(col_width[3], author.len());
             }
             col_width[0] = max(col_width[0], entry.entry_type.len());
@@ -17,7 +21,7 @@ impl crate::presenter::Presenter<Vec<&&BibTexEntry>> for Presenter {
             col_width[4] = max(col_width[4], entry.fields.get("year").map(|it| it.to_string()).unwrap_or(String::new()).len());
         }
 
-        col_width[2] = min(col_width[2], 60);
+        col_width[2] = min(col_width[2], MAX_TITLE_LEN);
 
         println!("+-{:->col0$}-+-{:->col1$}-+-{:->col2$}-+-{:->col3$}-+-{:->col4$}-+",
                  "",
@@ -61,8 +65,8 @@ impl crate::presenter::Presenter<Vec<&&BibTexEntry>> for Presenter {
         let empty_string = String::new();
         for entry in data {
             let author= entry.fields.get("author").map(|it| it.to_string()).unwrap_or(String::new());
-            let authors = author.split(" and ").collect::<Vec<_>>();
-            let title_lines = entry.fields.get("title").map(|it| multiline(&it.to_string(), 60)).unwrap_or(Vec::new());
+            let authors = author_split.split(&author).collect::<Vec<_>>();
+            let title_lines = entry.fields.get("title").map(|it| multiline(&it.to_string(), MAX_TITLE_LEN)).unwrap_or(Vec::new());
 
             let nb_lines = max(authors.len(), title_lines.len());
             for i in 0..nb_lines {
