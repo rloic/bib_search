@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use crate::parsers::content::Content::{Braced, Concatenated, Inlined, Quoted};
 
 #[derive(Clone, Eq, PartialEq, Hash)]

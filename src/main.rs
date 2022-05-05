@@ -22,9 +22,7 @@ fn main() -> std::io::Result<()> {
         )
         .arg(Arg::new("queries")
             .long("query").short('q')
-            .required(true)
-            .takes_value(true)
-            .min_values(1))
+            .takes_value(true))
         .arg(Arg::new("tabular")
             .long("tabular").short('t'))
         .arg(Arg::new("decreasing")
@@ -62,12 +60,18 @@ fn main() -> std::io::Result<()> {
     }
 
     let mut selected_entries = HashSet::new();
-    for query in app.values_of("queries").unwrap() {
-        let filter = parser_query(query);
-        for entry in &entries {
-            if filter.accept(&entry) {
-                selected_entries.insert(entry);
+    if let Some(queries) = app.values_of("queries") {
+        for query in queries {
+            let filter = parser_query(query);
+            for entry in &entries {
+                if filter.accept(&entry) {
+                    selected_entries.insert(entry);
+                }
             }
+        }
+    } else {
+        for entry in &entries {
+            selected_entries.insert(entry);
         }
     }
 

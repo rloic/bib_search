@@ -1,4 +1,3 @@
-pub mod tsv;
 pub mod markdown_tabular;
 pub mod debug;
 pub mod bibtex;
