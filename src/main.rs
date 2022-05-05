@@ -19,6 +19,7 @@ fn main() -> std::io::Result<()> {
     let app = Command::new("bib_search")
         .arg(Arg::new("filenames")
             .takes_value(true)
+            .multiple_values(true)
         )
         .arg(Arg::new("queries")
             .long("query").short('q')
