@@ -18,9 +18,8 @@ use crate::tokenizer::{Tokenizer};
 fn main() -> std::io::Result<()> {
     let app = Command::new("bib_search")
         .arg(Arg::new("filenames")
-            .required(true)
             .takes_value(true)
-            .min_values(1))
+        )
         .arg(Arg::new("queries")
             .long("query").short('q')
             .required(true)
@@ -36,19 +35,30 @@ fn main() -> std::io::Result<()> {
 
     let mut entries = Vec::new();
     let mut files = Vec::new();
-    for filename in app.values_of("filenames").unwrap() {
-        let bib_file = File::open(filename)?;
-        {
-            let mut reader = BufReader::new(&bib_file);
-            let mut bib = String::new();
-            reader.read_to_string(&mut bib)?;
-            let mut tokenizer = Tokenizer::new(bib.chars());
-            let mut parser = BibTexParser::new(&mut tokenizer);
 
-            let mut file_entries = parser.entries();
-            entries.append(&mut file_entries);
+    if let Some(filenames) = app.values_of("filenames") {
+        for filename in filenames {
+            let bib_file = File::open(filename)?;
+            {
+                let mut reader = BufReader::new(&bib_file);
+                let mut bib = String::new();
+                reader.read_to_string(&mut bib)?;
+                let mut tokenizer = Tokenizer::new(bib.chars());
+                let mut parser = BibTexParser::new(&mut tokenizer);
+
+                let mut file_entries = parser.entries();
+                entries.append(&mut file_entries);
+            }
+            files.push(bib_file);
         }
-        files.push(bib_file);
+    } else {
+        let mut bib = String::new();
+        std::io::stdin().read_to_string(&mut bib)?;
+        let mut tokenizer = Tokenizer::new(bib.chars());
+        let mut parser = BibTexParser::new(&mut tokenizer);
+
+        let mut file_entries = parser.entries();
+        entries.append(&mut file_entries);
     }
 
     let mut selected_entries = HashSet::new();
