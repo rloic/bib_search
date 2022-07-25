@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap};
-use crate::parsers::cite_key::CiteKeyParser;
+use crate::parsers::cite_key::{CiteKeyParser, Either};
 use crate::parsers::entry_type::EntryTypeParser;
 use crate::parsers::field_parser::FieldParser;
 use crate::{BibTexEntry, Tokenizer};
@@ -19,10 +19,14 @@ impl <'t, 'c: 't> BibTexEntryParser<'t, 'c> {
         self.tokenizer.skip(&AT_SIGN);
         let entry_type = EntryTypeParser::new(self.tokenizer).entry_type();
         self.tokenizer.skip(&OPEN_BRACKET);
-        let cite_key = CiteKeyParser::new(self.tokenizer).cite_key();
-        self.tokenizer.skip(&COMMA);
-
         let mut fields = BTreeMap::new();
+        let mut cite_key = String::new();
+        match CiteKeyParser::new(self.tokenizer).cite_key() {
+            Either::Left(inner) => { cite_key = inner; },
+            Either::Right((key, value)) => { fields.insert(key, value); }
+        };
+        self.tokenizer.skip_optional(&COMMA);
+
         while !CLOSE_BRACKET(self.tokenizer.lookahead) {
             let (key, value) = FieldParser::new(self.tokenizer).field();
             self.tokenizer.skip_optional(&COMMA);

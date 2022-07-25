@@ -17,5 +17,5 @@ impl<'t, 'c: 't> FieldNameParser<'t, 'c> {
 
 #[allow(non_snake_case)]
 fn IS_VALID_FIELD_NAME_CHARACTER(it: char) -> bool {
-    it.is_alphanumeric() || ['-'].contains(&it)
+    it.is_alphanumeric() || ['-', '_'].contains(&it)
 }

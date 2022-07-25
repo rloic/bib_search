@@ -1,6 +1,12 @@
-use crate::Tokenizer;
+use crate::{Content, Tokenizer};
+use crate::Content::Concatenated;
+use crate::parsers::content_parser::ContentParser;
+use crate::tokenizer::{ASSIGN, CONCAT};
 
 type CiteKey = String;
+pub enum Either<L, R> {
+    Left(L), Right(R)
+}
 
 pub struct CiteKeyParser<'t, 'c> {
     pub tokenizer: &'t mut Tokenizer<'c>
@@ -11,8 +17,20 @@ impl <'t, 'c: 't> CiteKeyParser<'t, 'c> {
     }
 
     // [a-zA-Z0-9-_+/:.]*
-    pub fn cite_key(&mut self) -> CiteKey {
-        self.tokenizer.consume_while(&IS_CITE_KEY_CHARACTER)
+    pub fn cite_key(&mut self) -> Either<CiteKey, (String, Content)> {
+        let cite_key = self.tokenizer.consume_while(&IS_CITE_KEY_CHARACTER);
+        if ASSIGN(self.tokenizer.lookahead) {
+            self.tokenizer.skip(&ASSIGN);
+            let mut contents = Vec::new();
+            contents.push(ContentParser::new(self.tokenizer).content());
+            while CONCAT(self.tokenizer.lookahead) {
+                self.tokenizer.skip(&CONCAT);
+                contents.push(ContentParser::new(self.tokenizer).content());
+            }
+            Either::Right((cite_key, Concatenated(contents)))
+        } else {
+            Either::Left(cite_key)
+        }
     }
 
 }

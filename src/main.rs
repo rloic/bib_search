@@ -120,18 +120,20 @@ pub fn parser_query(query: &str) -> AndFilters<BibTexEntry> {
         }
 
         let field_name = match field_name {
+            "@" => "entry_type",
             "t" => "title",
             "e" => "editor",
             "p" => "publisher",
             "a" => "author",
             "y" => "year",
+            "c" => "cite_key",
             _ => field_name
         };
 
         let filter: Box<dyn Filter<BibTexEntry>> = match field_name {
             "*" => Box::new(AnyFieldsContains::new(value)),
             "entry_type" => Box::new(EntryTypeContains::new(value)),
-            "c" | "cite_key" => Box::new(CiteKeyContains::new(value)),
+            "cite_key" => Box::new(CiteKeyContains::new(value)),
             _ => Box::new(FieldContains::new(field_name, value))
         };
 
