@@ -27,23 +27,13 @@ The installation command will generate the executable under the `target/release`
 You can run the executable with :
 
 ```sh
-bib_search bib_files -q queries
+bib_search bib_files -q query
 ```
-
-The first arguments are the bib files, the `-q` arguments are the queries. Each query must be of the format `field:value`. There is several shortcuts for the fields:
-
-| Shortcut | Equivalent Field |
-| -------- | ---------------- |
-| `t`      | title            |
-| `y`      | year             |
-| `a`      | author           |
-| `c`      | citation key     |
-| `p`      | publisher        |
 
 By default the results will be displayed in the default `BibTex` format.
 
 ```sh
-bib_search crypto.bib  -q 'c:C:FouJeaPey13' 'c:EC:BirNik10'
+bib_search crypto.bib  -q "cite_key = 'C:FouJeaPey13' or cite_key = 'EC:BirNik10'"
 ```
 
 ```bibtex
@@ -80,7 +70,7 @@ bib_search crypto.bib  -q 'c:C:FouJeaPey13' 'c:EC:BirNik10'
 You can also display in tab format with the `-t` flag which display the entry type, the citation key, the title, the authors and the year.
 
 ```sh
-bib_search crypto.bib personnal.bib  -t -q 'c:C:FouJeaPey13' 'c:EC:BirNik10'
+bib_search crypto.bib personnal.bib  -t -q "cite_key = 'C:FouJeaPey13' or cite_key = 'EC:BirNik10'"
 ```
 
 ```text
@@ -101,5 +91,5 @@ bib_search crypto.bib personnal.bib  -t -q 'c:C:FouJeaPey13' 'c:EC:BirNik10'
 
 ## Search rules
 
-To simplify the search, I have tried to remove punctuations and the search in insensitive, for example a search value `to aes` will match `to {AES}`. To apply `AND` filters, which means both conditions must be required, you must use the `&` character.  For example, you may write the following query: `t:high&a:knu` which means that I wan the entries that contains `high` in their title field and `knu` in their author field. To have different filters you have just to separate the different queries by a space `bib_search crypto.bib personnal.bib  -t -q 'c:C:FouJeaPey13' 'c:EC:BirNik10'` means that I search entries which have the citation key `C:FouJeaPey13` or `EC:BirNik10`.
+The search engines use SQL syntax but supports a limited set of operators. The current implemented operators are: `=`, `!=`, `>`, `>=`, `<`, `<=`, `like`, `ilike`, `and` and `or`.
 

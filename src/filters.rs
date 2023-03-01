@@ -108,6 +108,25 @@ impl<T> Filter<T> for AndFilters<T> {
     }
 }
 
+pub struct OrFilters<T> {
+    filters: Vec<Box<dyn Filter<T>>>,
+}
+
+impl<T> OrFilters<T> {
+    pub fn new(filters: Vec<Box<dyn Filter<T>>>) -> OrFilters<T> {
+        OrFilters { filters }
+    }
+}
+
+impl<T> Filter<T> for OrFilters<T> {
+    fn accept(&self, element: &T) -> bool {
+        for filter in &self.filters {
+            if filter.accept(element) { return true; }
+        }
+        false
+    }
+}
+
 fn simplify_latex(latex: &String) -> String {
     latex.replace('{', "")
         .replace('}', "")

@@ -5,39 +5,45 @@ mod presenter;
 
 extern crate core;
 
+use std::cmp::Ordering;
+use std::cmp::Ordering::{Greater, Less};
 use clap::{Arg, Command};
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
-use crate::filters::{AndFilters, AnyFieldsContains, CiteKeyContains, EntryTypeContains, FieldContains, Filter, NegateFilter};
+use std::path::PathBuf;
+use regex::Regex;
+use sqlparser::ast::{BinaryOperator, Expr, Query, UnaryOperator, Value};
+use sqlparser::ast::BinaryOperator::{And, Eq, Gt, GtEq, Lt, LtEq, NotEq, Or, Xor};
+use sqlparser::dialect::GenericDialect;
+use crate::filters::{AndFilters, AnyFieldsContains, CiteKeyContains, EntryTypeContains, FieldContains, Filter, NegateFilter, OrFilters};
 use crate::parsers::BibTexParser;
 use crate::parsers::content::Content;
 use crate::presenter::Presenter;
 use crate::tokenizer::{Tokenizer};
 
+use clap::Parser;
+
+
+#[derive(Parser)]
+struct Args {
+    filenames: Vec<PathBuf>,
+    #[arg(short, long)]
+    query: Option<String>,
+    #[arg(short, long)]
+    tabular: bool,
+    #[arg(short, long)]
+    count: bool,
+}
+
 fn main() -> std::io::Result<()> {
-    let app = Command::new("bib_search")
-        .arg(Arg::new("filenames")
-            .takes_value(true)
-            .multiple_values(true)
-        )
-        .arg(Arg::new("queries")
-            .long("query").short('q')
-            .takes_value(true)
-            .multiple_values(true))
-        .arg(Arg::new("tabular")
-            .long("tabular").short('t'))
-        .arg(Arg::new("decreasing")
-            .long("decreasing").short('d'))
-        .arg(Arg::new("count")
-            .long("count").short('c'))
-        .get_matches();
+    let app: Args = Args::parse();
 
     let mut entries = Vec::new();
     let mut files = Vec::new();
 
-    if let Some(filenames) = app.values_of("filenames") {
-        for filename in filenames {
+    if !app.filenames.is_empty() {
+        for filename in app.filenames {
             let bib_file = File::open(filename)?;
             {
                 let mut reader = BufReader::new(&bib_file);
@@ -62,13 +68,15 @@ fn main() -> std::io::Result<()> {
     }
 
     let mut selected_entries = HashSet::new();
-    if let Some(queries) = app.values_of("queries") {
-        for query in queries {
-            let filter = parser_query(query);
-            for entry in &entries {
-                if filter.accept(&entry) {
-                    selected_entries.insert(entry);
-                }
+    if let Some(query) = app.query {
+        let mut ast = sqlparser::parser::Parser::new(&GenericDialect)
+            .try_with_sql(&query)
+            .unwrap();
+        let where_clause = ast_to_predicate(ast.parse_expr().unwrap());
+
+        for entry in &entries {
+            if where_clause.accept(entry) {
+                selected_entries.insert(entry);
             }
         }
     } else {
@@ -79,19 +87,19 @@ fn main() -> std::io::Result<()> {
 
     let mut sorted_entries = selected_entries.iter().collect::<Vec<_>>();
     sorted_entries.sort_by_key(|it| it.fields.get("year").map(|it| it.to_string().parse::<i32>().unwrap_or(0)));
-    if app.is_present("decreasing") {
+    /*if app.is_present("decreasing") {
         sorted_entries.reverse();
-    }
+    }*/
 
-    if app.is_present("tabular") {
-        let presenter = presenter::markdown_tabular::Presenter{};
+    if app.tabular {
+        let presenter = presenter::markdown_tabular::Presenter {};
         presenter.present(&sorted_entries);
     } else {
-        let presenter = presenter::bibtex::Presenter{};
+        let presenter = presenter::bibtex::Presenter {};
         presenter.present(&sorted_entries);
     }
 
-    if app.is_present("count") {
+    if app.count {
         println!("{}", selected_entries.len());
     }
     Ok(())
@@ -102,6 +110,162 @@ pub struct BibTexEntry {
     pub entry_type: String,
     pub cite_key: String,
     pub fields: BTreeMap<String, Content>,
+}
+
+pub fn ast_to_predicate(ast: Expr) -> Box<dyn Filter<BibTexEntry>> {
+    match ast {
+        Expr::Nested(ast) => ast_to_predicate(*ast),
+        Expr::BinaryOp { left, op, right } => {
+            match op {
+                Eq => Box::new(EqFilter { lhs: ast_to_selector(*left), rhs: ast_to_selector(*right) }),
+                NotEq => Box::new(NeqFilter { lhs: ast_to_selector(*left), rhs: ast_to_selector(*right) }),
+                And => { Box::new(AndFilters::new(vec![ast_to_predicate(*left), ast_to_predicate(*right)])) }
+                Or => { Box::new(OrFilters::new(vec![ast_to_predicate(*left), ast_to_predicate(*right)])) }
+                Gt => Box::new(CmpFilter { lhs: ast_to_selector(*left), order: Greater, rhs: ast_to_selector(*right) }),
+                Lt => Box::new(CmpFilter { lhs: ast_to_selector(*left), order: Less, rhs: ast_to_selector(*right) }),
+                GtEq => Box::new(CmpInvFilter { lhs: ast_to_selector(*left), order: Less, rhs: ast_to_selector(*right) }),
+                LtEq => Box::new(CmpInvFilter { lhs: ast_to_selector(*left), order: Greater, rhs: ast_to_selector(*right) }),
+                _ => unimplemented!("unsupported operator {:?}", op)
+            }
+        }
+        Expr::Like { expr, negated, pattern, .. } => {
+            match pattern.as_ref() {
+                Expr::Value(value) => {
+                    match value {
+                        Value::SingleQuotedString(inner) => {
+                            let re: String = String::from("^") + &inner.replace("%", ".*").replace("_", ".") + "$";
+                            Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
+                        }
+                        _ => unimplemented!()
+                    }
+                }
+                _ => unimplemented!()
+            }
+        }
+        Expr::ILike { expr, negated, pattern, .. } => {
+            match pattern.as_ref() {
+                Expr::Value(value) => {
+                    match value {
+                        Value::SingleQuotedString(inner) => {
+                            let re: String = String::from("^(?i)") + &inner.replace("%", ".*").replace("_", ".") + "$";
+                            Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
+                        }
+                        _ => unimplemented!()
+                    }
+                }
+                _ => unimplemented!()
+            }
+        }
+        _ => unimplemented!("unsupported expression {:?}", ast)
+    }
+}
+
+struct CmpFilter {
+    lhs: Box<dyn Selector<BibTexEntry>>,
+    order: Ordering,
+    rhs: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for CmpFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        let (lhs, rhs) = (self.lhs.select(element), self.rhs.select(element));
+        match (lhs, rhs) {
+            (Some(l_value), Some(r_value)) => natord::compare(&l_value, &r_value) == self.order,
+            _ => false
+        }
+    }
+}
+
+struct CmpInvFilter {
+    lhs: Box<dyn Selector<BibTexEntry>>,
+    order: Ordering,
+    rhs: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for CmpInvFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        let (lhs, rhs) = (self.lhs.select(element), self.rhs.select(element));
+        match (lhs, rhs) {
+            (Some(l_value), Some(r_value)) => natord::compare(&l_value, &r_value) != self.order,
+            _ => false
+        }
+    }
+}
+
+struct LikeFilter {
+    lhs: Box<dyn Selector<BibTexEntry>>,
+    expr: Regex,
+    negated: bool,
+}
+
+impl Filter<BibTexEntry> for LikeFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        if let Some(value) = self.lhs.select(element) {
+            self.expr.is_match(&value) != self.negated
+        } else {
+            self.negated
+        }
+    }
+}
+
+struct EqFilter {
+    lhs: Box<dyn Selector<BibTexEntry>>,
+    rhs: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for EqFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        self.lhs.select(element) == self.rhs.select(element)
+    }
+}
+
+struct NeqFilter {
+    lhs: Box<dyn Selector<BibTexEntry>>,
+    rhs: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for NeqFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        self.lhs.select(element) != self.rhs.select(element)
+    }
+}
+
+pub trait Selector<T> {
+    fn select(&self, element: &T) -> Option<String>;
+}
+
+struct FieldSelector {
+    field_name: String,
+}
+
+impl Selector<BibTexEntry> for Option<String> {
+    fn select(&self, _: &BibTexEntry) -> Option<String> {
+        self.clone()
+    }
+}
+
+impl Selector<BibTexEntry> for FieldSelector {
+    fn select(&self, element: &BibTexEntry) -> Option<String> {
+        match self.field_name.as_str() {
+            "entry_type" => Some(element.entry_type.clone()),
+            "cite_key" => Some(element.cite_key.clone()),
+            field => element.fields.get(field)
+                .map(|it| it.to_string())
+        }
+    }
+}
+
+pub fn ast_to_selector(expr: Expr) -> Box<dyn Selector<BibTexEntry>> {
+    match expr {
+        Expr::Identifier(ident) => Box::new(FieldSelector { field_name: ident.value }),
+        Expr::Value(value) => match value {
+            sqlparser::ast::Value::Number(inner, _) => Box::new(Some(inner)),
+            sqlparser::ast::Value::Boolean(b) => Box::new(Some(b.to_string())),
+            sqlparser::ast::Value::SingleQuotedString(inner) => Box::new(Some(inner)),
+            _ => unimplemented!("unsupported value {:?}", value)
+        },
+        _ => unimplemented!("unsupported expression {:?}", expr)
+    }
 }
 
 pub fn parser_query(query: &str) -> AndFilters<BibTexEntry> {
