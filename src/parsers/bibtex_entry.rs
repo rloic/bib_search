@@ -3,6 +3,7 @@ use crate::parsers::cite_key::{CiteKeyParser, Either};
 use crate::parsers::entry_type::EntryTypeParser;
 use crate::parsers::field_parser::FieldParser;
 use crate::{BibTexEntry, Tokenizer};
+use crate::parsers::field::Field;
 use crate::tokenizer::{AT_SIGN, CLOSE_BRACKET, COMMA, OPEN_BRACKET};
 
 pub struct BibTexEntryParser<'t, 'c> {
@@ -21,14 +22,14 @@ impl <'t, 'c: 't> BibTexEntryParser<'t, 'c> {
         self.tokenizer.skip(&OPEN_BRACKET);
         let mut fields = BTreeMap::new();
         let mut cite_key = String::new();
-        match CiteKeyParser::new(self.tokenizer).cite_key() {
+        match CiteKeyParser::new(self.tokenizer).cite_key_or_field() {
             Either::Left(inner) => { cite_key = inner; },
-            Either::Right((key, value)) => { fields.insert(key, value); }
+            Either::Right(Field(key, value)) => { fields.insert(key, value); }
         };
         self.tokenizer.skip_optional(&COMMA);
 
         while !CLOSE_BRACKET(self.tokenizer.lookahead) {
-            let (key, value) = FieldParser::new(self.tokenizer).field();
+            let Field(key, value) = FieldParser::new(self.tokenizer).field();
             self.tokenizer.skip_optional(&COMMA);
             fields.insert(key, value);
         }

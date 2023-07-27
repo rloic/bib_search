@@ -7,16 +7,15 @@ extern crate core;
 
 use std::cmp::Ordering;
 use std::cmp::Ordering::{Greater, Less};
-use clap::{Arg, Command};
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use regex::Regex;
-use sqlparser::ast::{BinaryOperator, Expr, Query, UnaryOperator, Value};
-use sqlparser::ast::BinaryOperator::{And, Eq, Gt, GtEq, Lt, LtEq, NotEq, Or, Xor};
+use sqlparser::ast::{Expr, Value};
+use sqlparser::ast::BinaryOperator::{And, Eq, Gt, GtEq, Lt, LtEq, NotEq, Or};
 use sqlparser::dialect::GenericDialect;
-use crate::filters::{AndFilters, AnyFieldsContains, CiteKeyContains, EntryTypeContains, FieldContains, Filter, NegateFilter, OrFilters};
+use crate::filters::{AndFilters, Filter, OrFilters};
 use crate::parsers::BibTexParser;
 use crate::parsers::content::Content;
 use crate::presenter::Presenter;
@@ -135,6 +134,10 @@ pub fn ast_to_predicate(ast: Expr) -> Box<dyn Filter<BibTexEntry>> {
                         Value::SingleQuotedString(inner) => {
                             let re: String = String::from("^") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
+                        },
+                        Value::DoubleQuotedString(inner) => {
+                            let re: String = String::from("^") + &inner.replace("%", ".*").replace("_", ".") + "$";
+                            Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
                         }
                         _ => unimplemented!()
                     }
@@ -149,7 +152,11 @@ pub fn ast_to_predicate(ast: Expr) -> Box<dyn Filter<BibTexEntry>> {
                         Value::SingleQuotedString(inner) => {
                             let re: String = String::from("^(?i)") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
-                        }
+                        },
+                        Value::DoubleQuotedString(inner) => {
+                            let re: String = String::from("^(?i)") + &inner.replace("%", ".*").replace("_", ".") + "$";
+                            Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
+                        },
                         _ => unimplemented!()
                     }
                 }
@@ -259,54 +266,11 @@ pub fn ast_to_selector(expr: Expr) -> Box<dyn Selector<BibTexEntry>> {
     match expr {
         Expr::Identifier(ident) => Box::new(FieldSelector { field_name: ident.value }),
         Expr::Value(value) => match value {
-            sqlparser::ast::Value::Number(inner, _) => Box::new(Some(inner)),
-            sqlparser::ast::Value::Boolean(b) => Box::new(Some(b.to_string())),
-            sqlparser::ast::Value::SingleQuotedString(inner) => Box::new(Some(inner)),
+            Value::Number(inner, _) => Box::new(Some(inner)),
+            Value::Boolean(b) => Box::new(Some(b.to_string())),
+            Value::SingleQuotedString(inner) => Box::new(Some(inner)),
             _ => unimplemented!("unsupported value {:?}", value)
         },
         _ => unimplemented!("unsupported expression {:?}", expr)
     }
-}
-
-pub fn parser_query(query: &str) -> AndFilters<BibTexEntry> {
-    let mut filters: Vec<Box<dyn Filter<BibTexEntry>>> = Vec::new();
-    let lower_case = query.to_lowercase();
-    let suq_queries = lower_case.split('&');
-
-    for sub_query in suq_queries {
-        let (mut field_name, value) = sub_query.split_once(':')
-            .expect("Query must be of format: 'key:value'");
-
-        let mut accepts = true;
-        if field_name.starts_with('!') {
-            accepts = false;
-            field_name = &field_name[1..];
-        }
-
-        let field_name = match field_name {
-            "@" => "entry_type",
-            "t" => "title",
-            "e" => "editor",
-            "p" => "publisher",
-            "a" => "author",
-            "y" => "year",
-            "c" => "cite_key",
-            _ => field_name
-        };
-
-        let filter: Box<dyn Filter<BibTexEntry>> = match field_name {
-            "*" => Box::new(AnyFieldsContains::new(value)),
-            "entry_type" => Box::new(EntryTypeContains::new(value)),
-            "cite_key" => Box::new(CiteKeyContains::new(value)),
-            _ => Box::new(FieldContains::new(field_name, value))
-        };
-
-        if accepts {
-            filters.push(filter);
-        } else {
-            filters.push(Box::new(NegateFilter::new(filter)));
-        }
-    }
-
-    AndFilters::new(filters)
 }

@@ -1,7 +1,8 @@
 use crate::parsers::content_parser::ContentParser;
 use crate::parsers::filed_name_parser::FieldNameParser;
-use crate::{Content, Tokenizer};
+use crate::{Tokenizer};
 use crate::Content::Concatenated;
+use crate::parsers::field::Field;
 use crate::tokenizer::{ASSIGN, CONCAT};
 
 pub struct FieldParser<'t, 'c> {
@@ -14,7 +15,7 @@ impl<'t, 'c: 't> FieldParser<'t, 'c> {
     }
 
     // title '=' content ('#' content)*
-    pub fn field(&mut self) -> (String, Content) {
+    pub fn field(&mut self) -> Field {
         let title = FieldNameParser::new(self.tokenizer).field_name();
         self.tokenizer.skip(&ASSIGN);
         let mut contents = Vec::new();
@@ -23,7 +24,7 @@ impl<'t, 'c: 't> FieldParser<'t, 'c> {
             self.tokenizer.skip(&CONCAT);
             contents.push(ContentParser::new(self.tokenizer).content());
         }
-        (title, Concatenated(contents))
+        Field(title, Concatenated(contents))
     }
 }
 

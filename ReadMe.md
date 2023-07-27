@@ -70,7 +70,7 @@ bib_search crypto.bib  -q "cite_key = 'C:FouJeaPey13' or cite_key = 'EC:BirNik10
 You can also display in tab format with the `-t` flag which display the entry type, the citation key, the title, the authors and the year.
 
 ```sh
-bib_search crypto.bib personnal.bib  -t -q "cite_key = 'C:FouJeaPey13' or cite_key = 'EC:BirNik10'"
+bib_search crypto.bib personnal.bib -t -q "cite_key = 'C:FouJeaPey13' or cite_key = 'EC:BirNik10'"
 ```
 
 ```text

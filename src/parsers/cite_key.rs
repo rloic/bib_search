@@ -1,6 +1,7 @@
-use crate::{Content, Tokenizer};
+use crate::{Tokenizer};
 use crate::Content::Concatenated;
 use crate::parsers::content_parser::ContentParser;
+use crate::parsers::field::Field;
 use crate::tokenizer::{ASSIGN, CONCAT};
 
 type CiteKey = String;
@@ -17,7 +18,7 @@ impl <'t, 'c: 't> CiteKeyParser<'t, 'c> {
     }
 
     // [a-zA-Z0-9-_+/:.]*
-    pub fn cite_key(&mut self) -> Either<CiteKey, (String, Content)> {
+    pub fn cite_key_or_field(&mut self) -> Either<CiteKey, Field> {
         let cite_key = self.tokenizer.consume_while(&IS_CITE_KEY_CHARACTER);
         if ASSIGN(self.tokenizer.lookahead) {
             self.tokenizer.skip(&ASSIGN);
@@ -27,7 +28,7 @@ impl <'t, 'c: 't> CiteKeyParser<'t, 'c> {
                 self.tokenizer.skip(&CONCAT);
                 contents.push(ContentParser::new(self.tokenizer).content());
             }
-            Either::Right((cite_key, Concatenated(contents)))
+            Either::Right(Field(cite_key, Concatenated(contents)))
         } else {
             Either::Left(cite_key)
         }
