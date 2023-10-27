@@ -134,7 +134,7 @@ pub fn ast_to_predicate(ast: Expr) -> Box<dyn Filter<BibTexEntry>> {
                         Value::SingleQuotedString(inner) => {
                             let re: String = String::from("^") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
-                        },
+                        }
                         Value::DoubleQuotedString(inner) => {
                             let re: String = String::from("^") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
@@ -152,16 +152,22 @@ pub fn ast_to_predicate(ast: Expr) -> Box<dyn Filter<BibTexEntry>> {
                         Value::SingleQuotedString(inner) => {
                             let re: String = String::from("^(?i)") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
-                        },
+                        }
                         Value::DoubleQuotedString(inner) => {
                             let re: String = String::from("^(?i)") + &inner.replace("%", ".*").replace("_", ".") + "$";
                             Box::new(LikeFilter { lhs: ast_to_selector(*expr), expr: Regex::new(&re).unwrap(), negated })
-                        },
+                        }
                         _ => unimplemented!()
                     }
                 }
                 _ => unimplemented!()
             }
+        }
+        Expr::IsNotNull(expr) => {
+            Box::new(IsNotNullFilter { selector: ast_to_selector(*expr) })
+        }
+        Expr::IsNull(expr) => {
+            Box::new(IsNullFilter { selector: ast_to_selector(*expr) })
         }
         _ => unimplemented!("unsupported expression {:?}", ast)
     }
@@ -234,6 +240,26 @@ struct NeqFilter {
 impl Filter<BibTexEntry> for NeqFilter {
     fn accept(&self, element: &BibTexEntry) -> bool {
         self.lhs.select(element) != self.rhs.select(element)
+    }
+}
+
+struct IsNullFilter {
+    selector: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for IsNullFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        self.selector.select(element).is_none()
+    }
+}
+
+struct IsNotNullFilter {
+    selector: Box<dyn Selector<BibTexEntry>>,
+}
+
+impl Filter<BibTexEntry> for IsNotNullFilter {
+    fn accept(&self, element: &BibTexEntry) -> bool {
+        self.selector.select(element).is_some()
     }
 }
 
